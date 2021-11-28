@@ -21,7 +21,7 @@ function sendLine(line) {
 	if (cleanLine.length) {
 		console.log("Sending Line:", cleanLine);
 
-		const logChannel = client.channels.cache.get("912817725502525450");
+		const logChannel = client.channels.cache.get(process.env.CHANNEL_ID);
 
 		// @ts-ignore
 		logChannel.send(cleanLine);
@@ -29,7 +29,7 @@ function sendLine(line) {
 		//? Check if the message is an error, if so ping.
 		if (line.includes("[31m")) {
 			// @ts-ignore
-			logChannel.send("<@342874998375186432>");
+			logChannel.send(`<@${process.env.USER_MENTION_ID}>`);
 		}
 	}
 }
@@ -42,7 +42,7 @@ client.login(process.env.TOKEN);
 
 //? Below is code used to monitor changes in the log file. ------------------------------------------------
 const options = {
-	logFile: "./../dsns.dev/logs/server.log",
+	logFile: `./../${process.env.FOLDER}/logs/server.log`,
 	endOfLineChar: os.EOL
 };
 

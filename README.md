@@ -25,3 +25,5 @@ To launch the project locally, you'll need [Node.js](https://nodejs.org/en/) ins
     ```
     node .
     ```
+
+Credit to https://github.com/chevtek/hearthstone-log-watcher and https://stackoverflow.com/a/38191024 for the code to monitor the logs for changes.

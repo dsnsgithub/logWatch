@@ -1,27 +1,37 @@
 // @ts-check
+
 import fs from "fs";
 import { Client, Intents } from "discord.js";
 import stripAnsi from "strip-ansi";
 import os from "os";
-
 import path from "path";
 
 import * as dotenv from "dotenv";
 const __dirname = path.resolve();
-
 dotenv.config({ path: __dirname + "/.env" });
+
+//? Discord --------------------------------------------------------------------------------------------------------------------
 
 const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
 
 /**
  * @param {string} line
  */
-function sendLine(line) {
+function sendLine(line, filepath, type) {
 	const cleanLine = stripAnsi(line);
-	if (cleanLine.length) {
-		console.log("Sending Line:", cleanLine);
+	if (!cleanLine.length) return;
 
-		const logChannel = client.channels.cache.get(process.env.CHANNEL_ID);
+	console.log("Sending Line:", cleanLine);
+
+	if (type == "request") {
+		const logChannel = client.channels.cache.get(process.env.DISCORD_REQUEST);
+
+		// @ts-ignore
+		logChannel.send(cleanLine);
+	}
+
+	if (type == "console") {
+		const logChannel = client.channels.cache.get(process.env.DISCORD_CONSOLE);
 
 		// @ts-ignore
 		logChannel.send(cleanLine);
@@ -40,46 +50,34 @@ client.on("ready", () => {
 
 client.login(process.env.TOKEN);
 
-//? Below is code used to monitor changes in the log file. ------------------------------------------------
-const options = {
-	logFile: `./../${process.env.FOLDER}/logs/server.log`,
-	endOfLineChar: os.EOL
-};
+//? Tracking -------------------------------------------------------------------------------------------------------------
 
-let fileSize = fs.statSync(options.logFile).size;
-fs.watchFile(options.logFile, function (current, previous) {
-	// If modified time is the same, nothing changed so don't bother parsing.
-	if (current.mtime <= previous.mtime) return;
+function trackFile(filePath, type) {
+	let fileSize = fs.statSync(filePath).size;
 
-	const newFileSize = fs.statSync(options.logFile).size;
+	fs.watchFile(filePath, (current, previous) => {
+		if (current.mtime <= previous.mtime) return;
 
-	// Calculate size difference.
-	let sizeDiff = newFileSize - fileSize;
+		const newFileSize = fs.statSync(filePath).size;
+		let sizeDiff = newFileSize - fileSize;
 
-	// Create a buffer to hold only the data we intend to read.
-	const buffer = Buffer.alloc(sizeDiff);
+		const buffer = Buffer.alloc(sizeDiff);
+		const fileDescriptor = fs.openSync(filePath, "r");
 
-	// Obtain reference to the file's descriptor.
-	const fileDescriptor = fs.openSync(options.logFile, "r");
+		fs.readSync(fileDescriptor, buffer, 0, sizeDiff, fileSize);
+		fs.closeSync(fileDescriptor);
 
-	// Synchronously read from the file starting from where we read
-	// to last time and store data in our buffer.
-	fs.readSync(fileDescriptor, buffer, 0, sizeDiff, fileSize);
-	fs.closeSync(fileDescriptor); // close the file
+		fileSize = newFileSize;
 
-	// Set old file size to the new size for next read.
-	fileSize = newFileSize;
+		const bufferArray = buffer.toString().split(os.EOL);
 
-	// Parse the line(s) in the buffer.
-	parseBuffer(buffer);
-});
+		for (const line of bufferArray) {
+			sendLine(line, filePath, type);
+		}
+	});
 
-function parseBuffer(buffer) {
-	// Iterate over each line in the buffer.
-	buffer
-		.toString()
-		.split(options.endOfLineChar)
-		.forEach(function (line) {
-			sendLine(line);
-		});
+	console.log("Watching file:", filePath);
 }
+
+trackFile(path.join(`${__dirname}/../${process.env.FOLDER}/logs/request.log`), "request");
+trackFile(path.join(`${__dirname}/../${process.env.FOLDER}/logs/console.log`), "console");
